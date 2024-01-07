@@ -33,28 +33,47 @@ const LyricContainer = styled.div`
   margin-top: 50px;
   z-index: -10;
   display: flex;
-  height: 800px;
+  height: 50rem;
   width: 100%;
   justify-content: center;
   font-size: 2rem;
   color: #c7c7c7;
   text-align: center;
   box-sizing: border-box;
+  padding: 20px;
+
+  @media (max-width: 560px) {
+    font-size: 1.3rem;
+    padding: 50px;
+    height: 35rem;
+  };
 `;
 
+const listGap = 20;
+
 const List = styled.ul<{offset?: number}>`
-  transform: translateY(${props => props.offset || 0}px);
+  transform: translateY(${props => props.offset}px);
+  /* transform: translateY(-3700px); */
   transition: 0.6s;
+  padding-inline-start: 0;
+  word-break: keep-all;
+  display: flex;
+  flex-direction: column;
+  gap: ${listGap}px;
+  margin-block-start: 0;
+  margin-block-end: 0;
 `;
 
 const ListItem = styled.li`
+  --lineHeight: 3.5rem;
+
   list-style-type: none;
   transition: 0.2s;
-  height: 3.5rem;
-
+  /* min-height: var(--lineHeight); */
+  /* line-height: var(--lineHeight); */
   &.active {
     color: #fff;
-    transform: scale(1.5);
+    transform: scale(1.1);
   }
 `;
 
@@ -98,7 +117,7 @@ const lyricData = parseLyric(data);
 function findLyricIndex(lyric: Array<LyricLine>, timestamp: number): number {
   let targetIndex = -1;
   for (let i = 0; i < lyric.length; ++i) {
-    if (lyric[i].timestamp <= timestamp - 0.3) {
+    if (lyric[i].timestamp <= timestamp) {
       targetIndex = i;
     }
     else {
@@ -109,25 +128,39 @@ function findLyricIndex(lyric: Array<LyricLine>, timestamp: number): number {
   return targetIndex;
 }
 
-// console.log(lyricData);
-// console.log(findLyricIndex(lyricData, 36.50));
-// console.log(lyricData[findLyricIndex(lyricData, 35.3)]);
 
 function App() {
   const lyricContainerRef = useRef<HTMLDivElement>(null);
-  const firstLineRef = useRef<HTMLLIElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const lineRefs = lyricData.map(() => useRef<HTMLLIElement>(null));
+  const liHeights = useRef<Array<number>>([]);
+  const containerHeight = useRef<number>(0);
+
+  console.log('lyric length', lyricData.length);
+
+  useEffect(() => {
+    for (let i = 0; i < lyricData.length; ++i) {
+      liHeights.current[i] = lineRefs[i].current?.clientHeight || 0;
+    }
+
+    containerHeight.current = lyricContainerRef.current?.clientHeight || 0;
+  }, []);
 
 
   const getOffset = (currentTime: number) => {
     const index = findLyricIndex(lyricData, currentTime);
-    const liHeight = firstLineRef.current?.clientHeight || 0;
-    const containerHeight = lyricContainerRef.current?.clientHeight || 0;
-    const maxOffset = liHeight * lyricData.length - containerHeight;
-    let offs = liHeight * index + liHeight / 2 - containerHeight * 1 / 3;
+    let liPosition = 0;
+    for (let i = 0; i < index; ++i) {
+      liPosition += liHeights.current[i] + listGap;
+    }
+    const liHeight = liHeights.current[index];
+    console.log(liHeight);
+    const maxOffset = liHeights.current.reduce((prev, curr) => prev + curr + listGap, 0) - listGap - containerHeight.current;
+    console.log(maxOffset);
+    let offs = liPosition + liHeight / 2 - containerHeight.current * 1 / 3;
     offs = Math.max(offs, 0);
-    // offs = Math.min(offs, maxOffset);
-
+    offs = Math.min(offs, maxOffset);
+    console.log(offs);
     return -offs;
   };
 
@@ -138,10 +171,9 @@ function App() {
     const index = findLyricIndex(lyricData, event.currentTarget.currentTime);
     setActiveIndex(index);
     const offs = getOffset(event.currentTarget.currentTime);
-    console.dir(offs);
+
     setOffset(offs);  
   };
-
   
   return (
     <AppContainer>
@@ -150,7 +182,7 @@ function App() {
       </PlayerContainer>
       <LyricContainer ref={lyricContainerRef}>
         <List offset={offset}>
-          {lyricData.map((item, idx) => idx == 0 ? <ListItem key={idx} ref={firstLineRef} className={idx === activeIndex ? 'active' : ''}>{item.text}</ListItem> : <ListItem className={idx === activeIndex ? 'active' : ''} key={idx}>{item.text}</ListItem>)}
+          {lyricData.map((item, idx) => <ListItem className={idx === activeIndex ? 'active' : ''} key={idx} ref={lineRefs[idx]}>{item.text}</ListItem>)}
         </List>
       </LyricContainer>
     </AppContainer>
